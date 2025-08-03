@@ -9,7 +9,6 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { createWorker } from 'tesseract.js';
-import { fromBase64 } from 'pdf2pic';
 import { promisify } from 'util';
 import { exec as execCallback } from 'child_process';
 
@@ -19,6 +18,34 @@ const writeFile = promisify(fs.writeFile);
 const unlink = promisify(fs.unlink);
 const mkdir = promisify(fs.mkdir);
 const exec = promisify(execCallback);
+
+// Create a polyfill for DOMMatrix which is not available in Node.js
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  globalThis.DOMMatrix = class DOMMatrix {
+    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+    m11 = 1; m12 = 0; m13 = 0; m14 = 0;
+    m21 = 0; m22 = 1; m23 = 0; m24 = 0;
+    m31 = 0; m32 = 0; m33 = 1; m34 = 0;
+    m41 = 0; m42 = 0; m43 = 0; m44 = 1;
+    is2D = true;
+    isIdentity = true;
+    
+    constructor(init?: string | number[]) {
+      // Basic implementation
+      if (Array.isArray(init) && init.length === 6) {
+        this.a = init[0]; this.b = init[1]; 
+        this.c = init[2]; this.d = init[3]; 
+        this.e = init[4]; this.f = init[5];
+      }
+    }
+    
+    // Add minimal methods needed
+    translate() { return this; }
+    scale() { return this; }
+    multiply() { return this; }
+    inverse() { return this; }
+  } as any;
+}
 
 interface ProcessedDocument {
   text: string;
@@ -44,7 +71,7 @@ export async function processDocument(filePath: string): Promise<ProcessedDocume
     const metadata = {
       isScanned: false,
       ocrApplied: false,
-      pageCount: 0, // Add pageCount with default value
+      pageCount: 0,
       fileType: fileExt.replace('.', ''),
       fileSize
     };
@@ -52,47 +79,54 @@ export async function processDocument(filePath: string): Promise<ProcessedDocume
     let text = '';
 
     if (fileExt === '.pdf') {
-      // Process PDF
-      const data = new Uint8Array(fs.readFileSync(filePath));
-      const pdf = await getDocument({ data }).promise;
-      
-      metadata.pageCount = pdf.numPages;
-      
-      // Extract text from each page
-      let pdfText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        pdfText += content.items.map((item: any) => item.str).join(' ') + '\n';
-      }
-      
-      // If very little text extracted, it might be a scanned PDF
-      if (pdfText.trim().length < 100 && pdf.numPages > 0) {
-        metadata.isScanned = true;
-        metadata.ocrApplied = true;
+      try {
+        // Process PDF
+        const data = new Uint8Array(fs.readFileSync(filePath));
+        const pdf = await getDocument({ data }).promise;
         
-        // Apply OCR to the first page as a test
-        text = await extractTextWithOCR(filePath);
-      } else {
-        text = pdfText;
+        metadata.pageCount = pdf.numPages;
+        
+        // Extract text from each page
+        let pdfText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          pdfText += content.items.map((item: any) => item.str).join(' ') + '\n';
+        }
+        
+        // If very little text extracted, it might be a scanned PDF
+        if (pdfText.trim().length < 100 && pdf.numPages > 0) {
+          metadata.isScanned = true;
+          
+          // In server environment, we'll just note that OCR would be needed
+          // but won't attempt to run it as it's problematic in serverless
+          metadata.ocrApplied = false;
+          text = 'This appears to be a scanned document that requires OCR processing.';
+        } else {
+          text = pdfText;
+        }
+      } catch (pdfError) {
+        console.error('PDF processing error:', pdfError);
+        text = 'Error processing PDF document';
       }
     } else if (fileExt === '.docx') {
       // Process DOCX
-      const buffer = fs.readFileSync(filePath);
-      const result = await mammoth.extractRawText({ buffer });
-      text = result.value;
-    } else if (fileExt === '.doc') {
-      // Process legacy DOC format
       try {
-        // Attempt to process with pandoc if available
-        text = await processDocWithPandoc(filePath);
-      } catch (error) {
-        // Fallback to treating as plain text
-        text = fs.readFileSync(filePath, 'utf8');
+        const buffer = fs.readFileSync(filePath);
+        const result = await mammoth.extractRawText({ buffer });
+        text = result.value;
+      } catch (docxError) {
+        console.error('DOCX processing error:', docxError);
+        text = 'Error processing DOCX document';
       }
-    } else if (fileExt === '.txt') {
-      // Process TXT as plain text
-      text = fs.readFileSync(filePath, 'utf8');
+    } else if (fileExt === '.doc' || fileExt === '.txt') {
+      // Process TXT or legacy DOC as plain text
+      try {
+        text = fs.readFileSync(filePath, 'utf8');
+      } catch (txtError) {
+        console.error('Text file processing error:', txtError);
+        text = 'Error processing text document';
+      }
     } else {
       // Unsupported format
       text = `Unsupported file format: ${fileExt}`;
@@ -118,86 +152,18 @@ export async function processDocument(filePath: string): Promise<ProcessedDocume
 }
 
 /**
- * Extract text from images using OCR
+ * Calculate similarity score between two texts
+ * This is a simple implementation - production would use more sophisticated algorithms
  */
-async function extractTextWithOCR(pdfPath: string): Promise<string> {
-  try {
-    // Create a worker for OCR
-    const worker = await createWorker('eng');
-    let fullText = '';
-    
-    // Convert PDF to images and perform OCR
-    // We're using a simpler approach here to avoid filesystem issues
-    const pdfBuffer = fs.readFileSync(pdfPath);
-    const base64Pdf = pdfBuffer.toString('base64');
-    
-    // Only process first page for speed in this example
-    const options = {
-      density: 300,
-      quality: 100,
-      format: 'png',
-      width: 2000,
-      height: 2000
-    };
-    
-    // Check if pdf2pic has fromBase64 method (might be undefined in some environments)
-    if (typeof fromBase64 === 'function') {
-      const convert = fromBase64(base64Pdf, options);
-      const pageData = await convert(1);
-      
-      // Different versions of pdf2pic have different response formats
-      // Handle both possibilities
-      if (pageData) {
-        if ('base64' in pageData) {
-          const { data } = await worker.recognize((pageData as any).base64);
-          fullText += data.text + '\n';
-        } else if ('path' in pageData) {
-          const { data } = await worker.recognize((pageData as any).path);
-          fullText += data.text + '\n';
-        } else {
-          // Direct buffer recognition as fallback
-          const { data } = await worker.recognize(pdfBuffer);
-          fullText += data.text + '\n';
-        }
-      }
-    } else {
-      // Fallback method if pdf2pic doesn't work
-      fullText = "OCR processing unavailable in this environment.";
-    }
-    
-    await worker.terminate();
-    return fullText;
-  } catch (error) {
-    console.error('OCR error:', error);
-    return 'Error performing OCR on document';
-  }
-}
-
-/**
- * Process DOC files using Pandoc if available
- */
-async function processDocWithPandoc(filePath: string): Promise<string> {
-  try {
-    // Check if pandoc is available
-    await exec('pandoc --version');
-    
-    // Create temp file for output
-    const tempFile = path.join(os.tmpdir(), `${Date.now()}.txt`);
-    
-    // Convert DOC to TXT using pandoc
-    await exec(`pandoc -f doc -t plain "${filePath}" -o "${tempFile}"`);
-    
-    // Read the converted text
-    const text = await readFile(tempFile, 'utf-8');
-    
-    // Clean up
-    await unlink(tempFile);
-    
-    return text;
-  } catch (error) {
-    console.error('Pandoc processing error:', error);
-    throw error; // Let the caller handle the fallback
-  }
+export function calculateTextSimilarity(text1: string, text2: string): number {
+  // Simple Jaccard similarity for demo purposes
+  const words1 = new Set(text1.toLowerCase().split(/\W+/).filter(Boolean));
+  const words2 = new Set(text2.toLowerCase().split(/\W+/).filter(Boolean));
+  
+  const intersection = new Set([...words1].filter(word => words2.has(word)));
+  const union = new Set([...words1, ...words2]);
+  
+  return intersection.size / union.size;
 }
 
 /**
