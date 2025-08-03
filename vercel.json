@@ -4,20 +4,14 @@
   "devCommand": "npm run dev",
   "cleanUrls": true,
   "framework": "nextjs",
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
     },
     {
-      "src": "/(.*)",
-      "dest": "/$1",
-      "continue": true
-    },
-    {
-      "src": "/(.+)",
-      "status": 404,
-      "dest": "/404"
+      "source": "/:path*",
+      "destination": "/:path*"
     }
   ],
   "headers": [
@@ -46,3 +40,4 @@
     }
   }
 }
+ 
