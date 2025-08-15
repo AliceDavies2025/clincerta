@@ -154,19 +154,18 @@ export const DocumentUpload = ({
           const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
           const filePath = `${session.user.id}/${fileName}`;
           
+          if (!supabase) throw new Error('Supabase client not available');
+          
           const { data: uploadData, error: uploadError } = await supabase
             .storage
             .from('documents')
             .upload(filePath, file);
           
           if (uploadError) throw uploadError;
-          
           // Get public URL for the file
-          const { data: publicUrlData } = await supabase
-            .storage
+          const { data: publicUrlData } = await supabase.storage
             .from('documents')
             .getPublicUrl(filePath);
-          
           publicUrl = publicUrlData?.publicUrl || '';
           
           // Save to database with extracted text and metadata

@@ -1,11 +1,20 @@
 'use client';
 
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
+import dynamic from 'next/dynamic';
 import { useSupabase } from '../../../lib/supabase-provider';
 import SupabaseProvider from '../../../lib/supabase-provider';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+
+// Dynamically import Auth component to avoid SSR issues
+const Auth = dynamic(() => import('@supabase/auth-ui-react').then(mod => ({ default: mod.Auth })), {
+  ssr: false,
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded"></div>
+});
+
+const ThemeSupa = dynamic(() => import('@supabase/auth-ui-shared').then(mod => ({ default: mod.ThemeSupa })), {
+  ssr: false
+});
 
 export default function SignUpPage() {
   return (
