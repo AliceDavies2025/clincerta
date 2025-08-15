@@ -20,11 +20,26 @@ function SignInContent() {
   const router = useRouter();
 
   useEffect(() => {
+    // Check if user is already signed in
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        console.log('User already signed in, redirecting to dashboard');
+        router.push('/dashboard');
+      }
+    };
+    
+    checkUser();
+
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event);
       if (event === 'SIGNED_IN' && session) {
+        console.log('User signed in, redirecting to dashboard');
         router.push('/dashboard');
       }
     });
+    
     return () => subscription.unsubscribe();
   }, [supabase, router]);
 
@@ -36,6 +51,7 @@ function SignInContent() {
           supabaseClient={supabase}
           appearance={{ theme: ThemeSupa }}
           providers={['google']}
+          redirectTo={`${window.location.origin}/dashboard`}
         />
       </div>
     </div>

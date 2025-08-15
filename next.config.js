@@ -40,7 +40,7 @@ const nextConfig = {
         child_process: false
       };
     }
-
+    
     return config;
   },
   // Enable file serving for PDF, DOC, DOCX files (needed for document processing)

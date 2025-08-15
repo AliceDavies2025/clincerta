@@ -12,40 +12,46 @@ import type { Database } from '@/lib/database.types';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import { createWorker } from 'tesseract.js';
-import { fromPath as convertPdfToImage } from 'pdf2pic';
-import * as docx from 'docx';
 
-// Set pdfjs workerSrc (required for browser usage)
+// Fix the PDF.js worker loading issue without using a CDN
 if (typeof window !== 'undefined' && GlobalWorkerOptions) {
-  // Use the installed version from pdfjs-dist
-  const pdfJsVersion = '5.4.54'; // Match the version in package.json
-  GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfJsVersion}/pdf.worker.min.js`;
+  // Try multiple approaches to load the worker
+  try {
+    // First try the local worker file
+    GlobalWorkerOptions.workerSrc = `/pdf.worker.js`;
+  } catch (error) {
+    console.warn('Failed to set local worker, falling back to fake worker mode');
+    // If that fails, PDF.js will use fake worker mode
+    GlobalWorkerOptions.workerSrc = '';
+  }
 }
 
 export const DocumentUpload = ({
   demoMode = false,
   onDocumentUploaded,
+  onTextExtracted,
 }: {
   demoMode?: boolean;
   onDocumentUploaded?: () => void;
+  onTextExtracted?: (text: string, fileName: string, documentId?: number) => void;
 }) => {
   const { supabase, session, isGuest } = useSupabase();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [processingStep, setProcessingStep] = useState<string>('');
   const [processingProgress, setProcessingProgress] = useState<number>(0);
   const [isScannedPdf, setIsScannedPdf] = useState<boolean>(false);
   const [useOcr, setUseOcr] = useState<boolean>(false);
+  const [uploadedDocId, setUploadedDocId] = useState<number | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
-      setAnalysisResults(null);
       setProcessingStep('');
       setProcessingProgress(0);
       setIsScannedPdf(false);
       setUseOcr(false);
+      setUploadedDocId(null);
     }
   };
 
@@ -56,135 +62,95 @@ export const DocumentUpload = ({
     try {
       let fileText = '';
       let uploadedDocId: number | null = null;
-      let publicUrl: string = ''; // Add variable to store public URL
+      let publicUrl: string = '';
       
-      // Create form data for file upload
-      const formData = new FormData();
-      formData.append('file', file);
+      // Skip server processing and do everything client side
+      setProcessingStep('Extracting text from document...');
+      setProcessingProgress(10);
       
-      if (demoMode || isGuest) {
-        // Client-side processing for demo/guest mode
-        setProcessingStep('Extracting text from document...');
-        setProcessingProgress(10);
+      // Extract text on the client side
+      fileText = await extractTextFromFile(file);
+      
+      if (file.type === 'application/pdf' && fileText.trim().length < 100) {
+        setIsScannedPdf(true);
+        setProcessingStep('Detected scanned PDF, using OCR...');
+        setProcessingProgress(30);
         
-        fileText = await extractTextFromFile(file);
-        
-        // If text extraction yields very little text from a PDF, it might be scanned
-        if (file.type === 'application/pdf' && fileText.trim().length < 100) {
-          setIsScannedPdf(true);
-          setProcessingStep('Detected scanned PDF, using OCR...');
-          setProcessingProgress(30);
-          
-          if (typeof window !== 'undefined') {
-            // Only run OCR if in browser environment
-            fileText = await extractTextFromScannedPdf(file);
-            setUseOcr(true);
-          }
+        if (typeof window !== 'undefined') {
+          fileText = await extractTextFromScannedPdf(file);
+          setUseOcr(true);
         }
-        setProcessingProgress(50);
-      } 
-      else {
-        // Server-side processing for authenticated users
-        setProcessingStep('Processing document with advanced tools...');
-        setProcessingProgress(20);
-        
-        const response = await fetch('/api/documents/process', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (!response.ok) {
-          throw new Error('Server failed to process document');
-        }
-        
-        const result = await response.json();
-        
-        if (result.error) {
-          throw new Error(result.error);
-        }
-        
-        fileText = result.text;
-        uploadedDocId = result.documentId;
-        publicUrl = result.publicUrl || ''; // Get publicUrl from result
-        
-        // Update state based on processing results
-        setIsScannedPdf(result.metadata?.isScanned || false);
-        setUseOcr(result.metadata?.ocrApplied || false);
-        
-        // Notify parent to refresh document history
-        if (onDocumentUploaded) {
-          onDocumentUploaded();
-        }
-        
-        setProcessingProgress(50);
       }
-
-      setProcessingStep('Saving document metadata...');
+      
       setProcessingProgress(60);
       
-      const { data: dbData, error: dbError } = await supabase
-        .from('documents')
-        .insert({
-          user_id: session.user.id,
-          title: file.name,
-          file_type: file.type,
-          file_url: publicUrl,
-          text_content: fileText.substring(0, 10000), // Store first 10K chars for quick search
-          is_scanned_document: isScannedPdf,
-          ocr_applied: useOcr,
-        })
-        .select()
-        .single();
+      // Upload to storage if authenticated
+      if (session?.user?.id) {
+        setProcessingStep('Uploading to storage...');
+        
+        try {
+          // Upload file to Supabase storage directly from client
+          const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+          const filePath = `${session.user.id}/${fileName}`;
+          
+          const { data: uploadData, error: uploadError } = await supabase
+            .storage
+            .from('documents')
+            .upload(filePath, file);
+          
+          if (uploadError) throw uploadError;
+          
+          // Get public URL for the file
+          const { data: publicUrlData } = await supabase
+            .storage
+            .from('documents')
+            .getPublicUrl(filePath);
+          
+          publicUrl = publicUrlData?.publicUrl || '';
+        } catch (storageError) {
+          console.warn('Storage upload failed:', storageError);
+          // Continue with processing even if storage fails
+        }
+        
+        setProcessingStep('Saving document metadata...');
+        
+        // Save to database
+        const { data: dbData, error: dbError } = await supabase
+          .from('documents')
+          .insert({
+            user_id: session.user.id,
+            title: file.name,
+            file_type: file.type,
+            file_url: publicUrl,
+            text_content: fileText.substring(0, 10000), // Store first 10K chars for quick search
+            is_scanned_document: isScannedPdf,
+            ocr_applied: useOcr,
+          })
+          .select()
+          .single();
 
-      if (dbError) throw dbError;
-      uploadedDocId = dbData?.id;
-
-      // Notify parent to refresh history
-      if (onDocumentUploaded) onDocumentUploaded();
-
-      setProcessingStep('Analyzing document content...');
-      setProcessingProgress(70);
+        if (dbError) throw dbError;
+        uploadedDocId = dbData?.id;
+        setUploadedDocId(uploadedDocId);
+      }
       
-      // Call backend APIs for analysis
-      const [clonability, integrity, goldenThread, audit] = await Promise.all([
-        fetch('/api/clonability', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: fileText }),
-        }).then(res => res.json()),
-        fetch('/api/integrity', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: fileText }),
-        }).then(res => res.json()),
-        fetch('/api/golden-thread', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: fileText }),
-        }).then(res => res.json()),
-        fetch('/api/audit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: fileText, documentId: uploadedDocId }),
-        }).then(res => res.json()),
-      ]);
-
       setProcessingProgress(100);
-      setProcessingStep('Analysis complete');
+      setProcessingStep('Document processed successfully');
       
-      setAnalysisResults({
-        clonability,
-        integrity,
-        goldenThread,
-        audit,
-        textLength: fileText.length,
-        isScannedDocument: isScannedPdf,
-        ocrApplied: useOcr,
-      });
-
+      // Pass the extracted text to parent component
+      if (onTextExtracted) {
+        onTextExtracted(fileText, file.name, uploadedDocId || undefined);
+      }
+      
+      // Notify parent to refresh history
+      if (onDocumentUploaded) {
+        onDocumentUploaded();
+      }
+      
     } catch (error) {
       console.error('Upload error:', error);
-      setProcessingStep('Error processing document');
+      setProcessingStep(`Error: ${error instanceof Error ? error.message : 'Failed to process document'}`);
+      setProcessingProgress(0);
     } finally {
       setIsUploading(false);
     }
@@ -215,54 +181,132 @@ export const DocumentUpload = ({
   // Extract text from uploaded file
   const extractTextFromFile = async (file: File): Promise<string> => {
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (ext === 'pdf') {
-      // PDF extraction using pdfjs
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await getDocument({ data: arrayBuffer }).promise;
-      let text = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        setProcessingProgress(10 + Math.floor((i / pdf.numPages) * 30));
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        text += content.items.map((item: any) => item.str).join(' ') + '\n';
+    
+    try {
+      if (ext === 'pdf') {
+        console.log('Extracting text from PDF...');
+        setProcessingStep('Processing PDF pages...');
+        
+        // PDF extraction using pdfjs with better error handling
+        const arrayBuffer = await file.arrayBuffer();
+        console.log('PDF arrayBuffer size:', arrayBuffer.byteLength);
+        
+        const pdf = await getDocument({ 
+          data: arrayBuffer,
+          verbosity: 0 // Reduce console output
+        }).promise;
+        
+        console.log('PDF loaded, pages:', pdf.numPages);
+        let text = '';
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+          try {
+            setProcessingProgress(10 + Math.floor((i / pdf.numPages) * 30));
+            setProcessingStep(`Processing page ${i} of ${pdf.numPages}...`);
+            
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = content.items
+              .map((item: any) => {
+                // Handle different item types
+                if (item.str) {
+                  return item.str;
+                } else if (typeof item === 'string') {
+                  return item;
+                } else {
+                  return '';
+                }
+              })
+              .join(' ');
+            
+            text += pageText + '\n';
+            console.log(`Page ${i} extracted, length:`, pageText.length);
+          } catch (pageError) {
+            console.error(`Error extracting page ${i}:`, pageError);
+            text += `[Error extracting page ${i}]\n`;
+          }
+        }
+        
+        console.log('Total extracted text length:', text.length);
+        return text.trim() || '[No text could be extracted from this PDF]';
+        
+      } else if (ext === 'docx') {
+        console.log('Extracting text from DOCX...');
+        setProcessingStep('Processing DOCX document...');
+        
+        // DOCX extraction using mammoth
+        const arrayBuffer = await file.arrayBuffer();
+        const { value } = await mammoth.extractRawText({ arrayBuffer });
+        console.log('DOCX extracted text length:', value.length);
+        return value || '[No text could be extracted from this DOCX file]';
+        
+      } else if (ext === 'doc') {
+        console.log('Processing DOC file...');
+        setProcessingStep('Processing DOC document...');
+        
+        // For .doc files, try reading as text (limited support)
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            console.log('DOC file read as text, length:', result.length);
+            resolve(result || '[Unable to extract text from this DOC file]');
+          };
+          reader.onerror = () => {
+            console.error('Error reading DOC file');
+            resolve('[Error reading DOC file - please convert to DOCX or PDF]');
+          };
+          reader.readAsText(file);
+        });
+        
+      } else if (ext === 'txt') {
+        console.log('Reading TXT file...');
+        setProcessingStep('Reading text file...');
+        
+        // Plain text file
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            console.log('TXT file read, length:', result.length);
+            resolve(result || '[Empty text file]');
+          };
+          reader.onerror = () => {
+            console.error('Error reading TXT file');
+            resolve('[Error reading text file]');
+          };
+          reader.readAsText(file);
+        });
+        
+      } else {
+        console.log('Unknown file type, trying to read as text...');
+        setProcessingStep('Attempting to read as text...');
+        
+        // Fallback: try to read as plain text
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            console.log('File read as text, length:', result.length);
+            resolve(result || '[No text could be extracted from this file type]');
+          };
+          reader.onerror = () => {
+            console.error('Error reading file as text');
+            resolve('[Unsupported file type - please use PDF, DOCX, DOC, or TXT]');
+          };
+          reader.readAsText(file);
+        });
       }
-      return text;
-    } else if (ext === 'docx') {
-      // DOCX extraction using mammoth
-      const arrayBuffer = await file.arrayBuffer();
-      const { value } = await mammoth.extractRawText({ arrayBuffer });
-      return value;
-    } else if (ext === 'doc') {
-      // Plain text
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsText(file);
-      });
-    } else if (ext === 'txt') {
-      // Plain text
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsText(file);
-      });
-    } else {
-      // Fallback: try plain text
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsText(file);
-      });
+    } catch (error) {
+      console.error('Error in text extraction:', error);
+      return `[Error extracting text: ${error instanceof Error ? error.message : 'Unknown error'}]`;
     }
   };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md mb-12">
       <h2 className="text-xl font-bold mb-4">
-        {isGuest || demoMode ? "Guest Analysis" : "Document Analysis"}
+        {isGuest || demoMode ? "Guest Analysis" : "Document Upload"}
       </h2>
       <div className="mb-4">
         <input
@@ -282,7 +326,7 @@ export const DocumentUpload = ({
         disabled={!file || isUploading}
         className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
       >
-        {isUploading ? "Uploading & Analyzing..." : "Upload & Review"}
+        {isUploading ? "Uploading..." : "Upload Document"}
       </button>
 
       {isUploading && (
@@ -290,9 +334,18 @@ export const DocumentUpload = ({
           <div className="text-sm text-gray-600 dark:text-gray-300">{processingStep}</div>
           <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
             <div 
-              className={`bg-blue-600 h-2.5 rounded-full w-[${processingProgress}%]`}
+              className="bg-blue-600 h-2.5 rounded-full"
+              style={{ width: `${processingProgress}%` }}
             ></div>
           </div>
+        </div>
+      )}
+
+      {processingStep === 'Document processed successfully' && (
+        <div className="mt-4 p-3 bg-green-100 dark:bg-green-900/30 rounded-md">
+          <p className="text-sm text-green-700 dark:text-green-300">
+            Document successfully uploaded and text extracted. You can now analyze the document using the tools below.
+          </p>
         </div>
       )}
 
@@ -303,71 +356,6 @@ export const DocumentUpload = ({
           </p>
         </div>
       )}
-
-      {analysisResults && (
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-2">Audit Results</h3>
-          
-          {/* Document info */}
-          <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-700/30 rounded-md">
-            <h4 className="text-sm font-medium mb-1">Document Information</h4>
-            <p className="text-xs text-gray-600 dark:text-gray-300">
-              Text length: {analysisResults.textLength} characters
-              {analysisResults.isScannedDocument && " (Scanned document detected)"}
-              {analysisResults.ocrApplied && " (OCR applied)"}
-            </p>
-          </div>
-          
-          <div className="space-y-4">
-            {/* Clonability */}
-            <div>
-              <span className="font-medium">Originality Score:</span> {analysisResults.clonability.originality_score}%
-              <div className="text-xs text-gray-500">{analysisResults.clonability.details}</div>
-              {analysisResults.clonability.similarity > 0.5 && (
-                <div className="text-xs text-red-500">Most similar document: {analysisResults.clonability.most_similar_document}</div>
-              )}
-            </div>
-            {/* Integrity */}
-            <div>
-              <span className="font-medium">Clinical Integrity Score:</span> {analysisResults.integrity.integrity_score}%
-              <div className="text-xs text-gray-500">{analysisResults.integrity.feedback}</div>
-              {analysisResults.integrity.missing_elements.length > 0 && (
-                <div className="text-xs text-yellow-500">Missing: {analysisResults.integrity.missing_elements.join(", ")}</div>
-              )}
-            </div>
-            {/* Golden Thread */}
-            <div>
-              <span className="font-medium">Golden Thread Compliance:</span> {analysisResults.goldenThread.golden_thread_compliance}
-              <div className="text-xs text-gray-500">{analysisResults.goldenThread.feedback}</div>
-              <div className="text-xs text-blue-500">
-                Actions found: {analysisResults.goldenThread.actions_found.join(", ")}<br />
-                Interventions found: {analysisResults.goldenThread.interventions_found.join(", ")}
-              </div>
-            </div>
-            {/* Audit */}
-            <div>
-              <span className="font-medium">Audit Score:</span> {analysisResults.audit.audit_score}%
-              <div className="text-xs text-gray-500">{analysisResults.audit.feedback.join(" ")}</div>
-            </div>
-            <div>
-              <span className="font-medium">Improvement Suggestions:</span>
-              <ul className="list-disc ml-6 text-sm">
-                {analysisResults.audit.suggestions.map((s: string, idx: number) => (
-                  <li key={idx}>{s}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <span className="font-medium">Training Recommendations:</span>
-              <ul className="list-disc ml-6 text-sm">
-                {analysisResults.audit.training_recommendations.map((t: string, idx: number) => (
-                  <li key={idx}>{t}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
-}
+};
