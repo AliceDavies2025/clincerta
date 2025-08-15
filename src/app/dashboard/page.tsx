@@ -1,12 +1,14 @@
 'use client';
 
 // Ensure the file exists at src/lib/supabase-provider.tsx or .ts
-import SupabaseProvider from "../../lib/supabase-provider";
+import SupabaseProvider from "@/lib/supabase-provider";
 import { DocumentHistory } from "@/components/DocumentHistory";
 import { useSupabase } from "@/lib/supabase-provider";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { useState, useRef } from "react";
 import { DocumentActions } from "@/components/DocumentActions";
+import { CacheManager } from "@/components/CacheManager";
+import { StreamingTextDisplay } from "@/components/StreamingTextDisplay";
 
 export default function Dashboard() {
   return (
@@ -22,10 +24,10 @@ function DashboardContent() {
   const [currentDocument, setCurrentDocument] = useState<{
     text: string;
     fileName: string;
-    documentId?: number;
+    documentId?: string;
   } | null>(null);
 
-  const handleTextExtracted = (text: string, fileName: string, documentId?: number) => {
+  const handleTextExtracted = (text: string, fileName: string, documentId?: string) => {
     // Just store the document data for later use by action buttons
     setCurrentDocument({
       text,
@@ -64,6 +66,9 @@ function DashboardContent() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column - Upload and Actions */}
             <div className="lg:col-span-2 space-y-8">
+              {/* Cache Manager */}
+              <CacheManager />
+              
               {/* Upload Component */}
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700">
                 <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">Upload Documents</h2>
@@ -76,11 +81,25 @@ function DashboardContent() {
               
               {/* Document Actions Component - Only show when document is loaded */}
               {currentDocument && (
-                <DocumentActions
-                  documentText={currentDocument.text}
-                  documentName={currentDocument.fileName}
-                  documentId={currentDocument.documentId}
-                />
+                <>
+                  {/* Streaming Text Display */}
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700">
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">Extracted Text</h2>
+                    <StreamingTextDisplay
+                      text={currentDocument.text}
+                      isStreaming={false}
+                      maxHeight={400}
+                      showWordCount={true}
+                      showCharacterCount={true}
+                    />
+                  </div>
+                  
+                  <DocumentActions
+                    documentText={currentDocument.text}
+                    documentName={currentDocument.fileName}
+                    documentId={currentDocument.documentId}
+                  />
+                </>
               )}
               
               {/* Placeholder when no document is loaded */}

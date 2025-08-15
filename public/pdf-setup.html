@@ -1,0 +1,18 @@
+<!-- PDF.js Worker Setup -->
+<!-- This file helps ensure PDF.js worker is properly loaded -->
+<script>
+  console.log('PDF.js worker setup complete');
+  
+  // Check if worker is accessible
+  fetch('/pdf.worker.js')
+    .then(response => {
+      if (response.ok) {
+        console.log('✅ PDF.js worker is accessible');
+      } else {
+        console.warn('⚠️ PDF.js worker not accessible');
+      }
+    })
+    .catch(error => {
+      console.error('❌ Error checking PDF.js worker:', error);
+    });
+</script>
