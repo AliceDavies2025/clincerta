@@ -23,6 +23,7 @@ export const DocumentHistory = forwardRef(function DocumentHistory(_, ref) {
     setIsLoading(true);
     
     try {
+      if (!supabase) throw new Error('Supabase client is not initialized');
       // Fetch documents with their audit history
       const { data: docsData, error: docsError } = await supabase
         .from('documents')

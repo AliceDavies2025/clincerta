@@ -17,6 +17,7 @@ export type SupabaseContext = {
   session: any;
   isGuest: boolean;
   setIsGuest: (value: boolean) => void;
+  isLoading: boolean;
 };
 
 export const Context = createContext<SupabaseContext | undefined>(undefined);
@@ -29,6 +30,7 @@ export default function SupabaseProvider({
   const [session, setSession] = useState<any>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [supabase, setSupabase] = useState<SupabaseClient<Database> | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -36,6 +38,20 @@ export default function SupabaseProvider({
     if (typeof window !== 'undefined') {
       const client = createClientComponentClient<Database>();
       setSupabase(client);
+      
+      // Get initial session immediately
+      const getInitialSession = async () => {
+        try {
+          const { data: { session: initialSession } } = await client.auth.getSession();
+          setSession(initialSession);
+        } catch (error) {
+          console.error('Error getting initial session:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      getInitialSession();
     }
   }, []);
 
@@ -57,8 +73,8 @@ export default function SupabaseProvider({
     };
   }, [router, supabase]);
 
-  // Don't render children until Supabase client is ready
-  if (!supabase) {
+  // Don't render children until Supabase client is ready and initial session is loaded
+  if (!supabase || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -68,7 +84,7 @@ export default function SupabaseProvider({
   }
 
   return (
-    <Context.Provider value={{ supabase, session, isGuest, setIsGuest }}>
+    <Context.Provider value={{ supabase, session, isGuest, setIsGuest, isLoading }}>
       {children}
     </Context.Provider>
   );
