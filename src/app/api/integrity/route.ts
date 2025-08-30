@@ -645,9 +645,9 @@ class ClinicalIntegrityAnalyzer {
       if (foundRequired.length < config.required.length) {
         missing.push(...config.required.filter(req => !this.textLower.includes(req.toLowerCase())));
       }
-    }
+  }
 
-    return {
+  return { 
       score: Math.round(totalScore),
       breakdown: qualityScores,
       missing
@@ -748,7 +748,7 @@ class ClinicalIntegrityAnalyzer {
     
     return {
       integrity_score: overallScore,
-      feedback,
+    feedback,
       missing_elements: [...soapAnalysis.missing, ...docAnalysis.missing, ...safetyAnalysis.missing, ...qualityAnalysis.missing],
       entities: medicalEntities,
       key_phrases: this.extractKeyPhrases(),
@@ -793,11 +793,11 @@ class ClinicalIntegrityAnalyzer {
 
 export async function POST(req: NextRequest) {
   try {
-    const { text } = await req.json();
+  const { text } = await req.json();
 
-    if (!text || typeof text !== "string") {
-      return NextResponse.json({ error: "Missing or invalid text" }, { status: 400 });
-    }
+  if (!text || typeof text !== "string") {
+    return NextResponse.json({ error: "Missing or invalid text" }, { status: 400 });
+  }
 
     // Perform comprehensive clinical integrity analysis
     const analyzer = new ClinicalIntegrityAnalyzer(text);

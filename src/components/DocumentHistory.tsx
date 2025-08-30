@@ -26,7 +26,7 @@ export const DocumentHistory = forwardRef(function DocumentHistory(_, ref) {
       if (!supabase) throw new Error('Supabase client is not initialized');
       // Fetch documents with their audit history
       const { data: docsData, error: docsError } = await supabase
-        .from('documents')
+      .from('documents')
         .select(`
           *,
           audit_history (
@@ -40,12 +40,12 @@ export const DocumentHistory = forwardRef(function DocumentHistory(_, ref) {
             training_recommendations
           )
         `)
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false });
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false });
 
       if (docsError) {
         console.error('Error fetching documents:', docsError);
-      } else {
+    } else {
         setDocuments(docsData || []);
       }
     } catch (error) {
@@ -117,7 +117,7 @@ export const DocumentHistory = forwardRef(function DocumentHistory(_, ref) {
           Document History ({documents.length})
         </h3>
         
-        {documents.length === 0 ? (
+      {documents.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-gray-400 mb-2">
               <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -328,9 +328,9 @@ export const DocumentHistory = forwardRef(function DocumentHistory(_, ref) {
                               <li key={idx} className="text-xs text-gray-700 dark:text-gray-300 flex items-start">
                                 <span className="text-red-500 mr-2">•</span>
                                 <span>{issue}</span>
-                              </li>
-                            ))}
-                          </ul>
+            </li>
+          ))}
+        </ul>
                         </div>
                       )}
 

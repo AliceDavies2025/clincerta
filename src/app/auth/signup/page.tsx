@@ -17,7 +17,7 @@ export default function SignUpPage() {
 }
 
 function SignUpContent() {
-  const { supabase, session, isLoading: supabaseLoading } = useSupabase();
+  const { supabase, session } = useSupabase();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,21 +26,12 @@ function SignUpContent() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  // Redirect if already authenticated - only when Supabase is fully loaded
+  // Redirect if already authenticated
   useEffect(() => {
-    if (!supabaseLoading && session) {
+    if (session) {
       router.push('/dashboard');
     }
-  }, [session, router, supabaseLoading]);
-
-  // Show loading while Supabase is initializing
-  if (supabaseLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Loading..." />
-      </div>
-    );
-  }
+  }, [session, router]);
 
   // Don't render if already authenticated
   if (session) {

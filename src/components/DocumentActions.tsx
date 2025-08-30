@@ -39,7 +39,7 @@ type AnalysisResult = {
       documentId: number;
       title: string;
       category: string;
-      similarity: number;
+    similarity: number;
       breakdown: {
         jaccard: number;
         cosine: number;
@@ -516,9 +516,9 @@ export const DocumentActions = ({
                                 <div className="text-gray-500">Trigram</div>
                               </div>
                             </div>
-                          </div>
                         </div>
                       </div>
+                    </div>
                     )}
                     
                     {/* Recommendations */}
@@ -670,14 +670,14 @@ export const DocumentActions = ({
                             <div className="flex justify-between">
                               <span>Consent:</span>
                               <span className="font-mono">{analysisResults.integrity.detailed_analysis.documentation.breakdown?.informed_consent?.score || 0}%</span>
-                            </div>
+                      </div>
                             <div className="flex justify-between">
                               <span>Legal Requirements:</span>
                               <span className="font-mono">{analysisResults.integrity.detailed_analysis.documentation.breakdown?.legal_requirements?.score || 0}%</span>
-                            </div>
-                          </div>
                         </div>
-                        
+                      </div>
+                    </div>
+                    
                         {/* Quality Indicators */}
                         <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
                           <h4 className="font-medium mb-3 text-indigo-800 dark:text-indigo-200">Quality Indicators</h4>
@@ -734,8 +734,8 @@ export const DocumentActions = ({
                               "{phrase}"
                             </div>
                           ))}
-                        </div>
-                      </div>
+                                </div>
+                              </div>
                     )}
                     
                     {/* Missing Elements */}
@@ -810,8 +810,8 @@ export const DocumentActions = ({
                         }`}>
                           {analysisResults.goldenThread.golden_thread_compliance}
                         </span>
+                        </div>
                       </div>
-                    </div>
                     
                     {/* Feedback */}
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -833,8 +833,8 @@ export const DocumentActions = ({
                                     <div 
                                       className={`h-2 rounded-full ${data.score > 70 ? 'bg-green-500' : data.score > 40 ? 'bg-yellow-500' : 'bg-red-500'}`}
                                       style={{ width: `${data.score}%` }}
-                                    ></div>
-                                  </div>
+                          ></div>
+                        </div>
                                   <span className="text-xs font-mono w-8">{data.score}%</span>
                                 </div>
                               </div>
@@ -875,9 +875,9 @@ export const DocumentActions = ({
                                 </div>
                               </div>
                             ))}
-                          </div>
-                        </div>
-                        
+                      </div>
+                    </div>
+                    
                         {/* Golden Thread Connections */}
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                           <h4 className="font-medium mb-3 text-purple-800 dark:text-purple-200">Clinical Connections</h4>
@@ -939,11 +939,11 @@ export const DocumentActions = ({
                             </div>
                           )}
                         </div>
+                        </div>
                       </div>
-                    </div>
-                    
+                      
                     {/* Missing Connections */}
-                    {analysisResults.goldenThread.missing_connections.length > 0 && (
+                      {analysisResults.goldenThread.missing_connections.length > 0 && (
                       <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                         <h4 className="font-medium mb-3 text-yellow-800 dark:text-yellow-200">Missing Clinical Connections</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -953,9 +953,9 @@ export const DocumentActions = ({
                               <span className="text-sm">{connection.replace(/-/g, ' → ')}</span>
                             </div>
                           ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 )}
                 
@@ -1016,15 +1016,15 @@ export const DocumentActions = ({
                                     <div 
                                       className={`h-2 rounded-full ${data.percentage > 70 ? 'bg-green-500' : data.percentage > 40 ? 'bg-yellow-500' : 'bg-red-500'}`}
                                       style={{ width: `${data.percentage}%` }}
-                                    ></div>
-                                  </div>
+                          ></div>
+                        </div>
                                   <span className="text-xs font-mono w-8">{data.percentage}%</span>
                                 </div>
                               </div>
                             ))}
-                          </div>
-                        </div>
-                        
+                      </div>
+                    </div>
+                    
                         {/* Clinical Accuracy */}
                         <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                           <h4 className="font-medium mb-3 text-blue-800 dark:text-blue-200">Clinical Accuracy</h4>
@@ -1044,8 +1044,8 @@ export const DocumentActions = ({
                               </div>
                             ))}
                           </div>
-                        </div>
-                        
+                    </div>
+                    
                         {/* Documentation Quality */}
                         <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                           <h4 className="font-medium mb-3 text-purple-800 dark:text-purple-200">Documentation Quality</h4>
@@ -1064,9 +1064,9 @@ export const DocumentActions = ({
                                 </div>
                               </div>
                             ))}
-                          </div>
-                        </div>
-                        
+                      </div>
+                    </div>
+                    
                         {/* Compliance Standards */}
                         <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                           <h4 className="font-medium mb-3 text-yellow-800 dark:text-yellow-200">Compliance Standards</h4>
@@ -1085,8 +1085,8 @@ export const DocumentActions = ({
                                 </div>
                               </div>
                             ))}
-                          </div>
-                        </div>
+                      </div>
+                    </div>
                       </div>
                     )}
                     

@@ -167,35 +167,35 @@ export const DocumentUpload = ({
             .from('documents')
             .getPublicUrl(filePath);
           publicUrl = publicUrlData?.publicUrl || '';
-          
+        
           // Save to database with extracted text and metadata
-          const { data: dbData, error: dbError } = await supabase
-            .from('documents')
-            .insert({
-              user_id: session.user.id,
-              title: file.name,
-              file_type: file.type,
-              file_url: publicUrl,
+        const { data: dbData, error: dbError } = await supabase
+          .from('documents')
+          .insert({
+            user_id: session.user.id,
+            title: file.name,
+            file_type: file.type,
+            file_url: publicUrl,
               file_size: file.size,
               analysis_results: {
                 extracted_text: fileText,
                 processing_time: result.processingTime,
                 page_count: result.pageCount || 0,
                 is_scanned: result.isScanned,
-                ocr_applied: useOcr,
+            ocr_applied: useOcr,
                 processing_metadata: {
                   cache_hit: false,
                   errors: result.error ? [result.error] : []
                 }
               },
               is_guest_upload: false
-            })
-            .select()
-            .single();
+          })
+          .select()
+          .single();
 
-          if (dbError) throw dbError;
-          uploadedDocId = dbData?.id;
-          setUploadedDocId(uploadedDocId);
+        if (dbError) throw dbError;
+        uploadedDocId = dbData?.id;
+        setUploadedDocId(uploadedDocId);
         } catch (storageError) {
           console.warn('Storage/database upload failed:', storageError);
           // Continue with processing even if storage fails

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export const Navigation = () => {
-  const { supabase, session, isLoading: supabaseLoading } = useSupabase();
+  const { supabase, session } = useSupabase();
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
 
@@ -30,8 +30,8 @@ export const Navigation = () => {
     }
   };
 
-  // Don't render until client-side and Supabase is loaded
-  if (!isClient || supabaseLoading) {
+  // Don't render until client-side
+  if (!isClient) {
     return (
       <nav className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

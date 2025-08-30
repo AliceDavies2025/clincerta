@@ -13,45 +13,32 @@ import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Navigation } from "@/components/Navigation";
 
-export default function Dashboard() {
-  return (
-    <SupabaseProvider>
-      <DashboardContent />
-    </SupabaseProvider>
-  );
-}
-
-function DashboardContent() {
-  const { session, isLoading: supabaseLoading } = useSupabase();
+export default function DashboardPage() {
+  const { supabase, session } = useSupabase();
   const router = useRouter();
+
+  // Redirect to sign in if not authenticated
+  useEffect(() => {
+    if (!session) {
+      router.push('/auth/signin');
+    }
+  }, [session, router]);
+
+  // Show loading while checking authentication
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" text="Checking authentication..." />
+      </div>
+    );
+  }
+
   const historyRef = useRef<any>(null);
   const [currentDocument, setCurrentDocument] = useState<{
     text: string;
     fileName: string;
     documentId?: string;
   } | null>(null);
-
-  // Handle authentication redirects - only when Supabase is fully loaded
-  useEffect(() => {
-    if (!supabaseLoading && session === null) {
-      // User is not authenticated, redirect to signin
-      router.push('/auth/signin');
-    }
-  }, [session, router, supabaseLoading]);
-
-  // Show loading while Supabase is initializing
-  if (supabaseLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Loading dashboard..." />
-      </div>
-    );
-  }
-
-  // Don't render anything if not authenticated (will redirect)
-  if (!session) {
-    return null;
-  }
 
   const handleTextExtracted = (text: string, fileName: string, documentId?: string) => {
     // Just store the document data for later use by action buttons

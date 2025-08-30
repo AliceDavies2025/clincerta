@@ -108,7 +108,7 @@ export default function Home() {
             <div className="relative">
               <div className="absolute -top-10 -right-10 w-64 h-64 bg-blue-200/30 dark:bg-blue-900/20 rounded-full blur-3xl"></div>
               <div className="absolute -bottom-10 -left-10 w-64 h-64 bg-indigo-200/30 dark:bg-indigo-900/20 rounded-full blur-3xl"></div>
-              <div className="relative bg-white dark:bg-gray-800/80 p-6 rounded-2xl shadow-xl backdrop-blur-sm border border-gray-100 dark:border-gray-700/30 transform rotate-1">
+              <div className="relative bg-white dark:bg-gray-800/80 p-6 rounded-2xl shadow-xl backdrop-blur-sm border border-gray-100 dark:border-gray-700/30">
                 <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg mb-4 w-fit">
                   <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -129,8 +129,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Document upload component with a slight transformation for style */}
-        <div className="relative transform -rotate-1 mb-20">
+        {/* Document upload component */}
+        <div className="relative mb-20">
           <DocumentUpload demoMode={!session?.user?.email} />
         </div>
 

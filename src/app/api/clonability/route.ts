@@ -125,8 +125,8 @@ class TextSimilarityAnalyzer {
     
     const setA = new Set(ngramsA);
     const setB = new Set(ngramsB);
-    const intersection = new Set([...setA].filter(x => setB.has(x)));
-    const union = new Set([...setA, ...setB]);
+  const intersection = new Set([...setA].filter(x => setB.has(x)));
+  const union = new Set([...setA, ...setB]);
     
     return union.size > 0 ? intersection.size / union.size : 0;
   }
@@ -201,22 +201,22 @@ function detectPlagiarismPatterns(text: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { text } = await req.json();
+  const { text } = await req.json();
 
-    if (!text || typeof text !== "string") {
-      return NextResponse.json({ error: "Missing or invalid text" }, { status: 400 });
-    }
+  if (!text || typeof text !== "string") {
+    return NextResponse.json({ error: "Missing or invalid text" }, { status: 400 });
+  }
 
     // Analyze the input text
     const textAnalysis = analyzeTextComplexity(text);
     const plagiarismPatterns = detectPlagiarismPatterns(text);
 
     // Compare input text to each document in the database
-    let maxSimilarity = 0;
+  let maxSimilarity = 0;
     let mostSimilarDoc = null;
     let allSimilarities = [];
 
-    for (const doc of mockDocuments) {
+  for (const doc of mockDocuments) {
       const similarity = TextSimilarityAnalyzer.comprehensiveSimilarity(text, doc.content);
       
       allSimilarities.push({
@@ -257,11 +257,11 @@ export async function POST(req: NextRequest) {
 
     // Generate detailed analysis
     const analysis = {
-      originality_score: originalityScore,
+    originality_score: originalityScore,
       risk_level: riskLevel,
       risk_description: riskDescription,
       overall_similarity: maxSimilarity,
-      most_similar_document: mostSimilarDoc,
+    most_similar_document: mostSimilarDoc,
       text_analysis: textAnalysis,
       plagiarism_patterns: plagiarismPatterns,
       all_similarities: allSimilarities.slice(0, 5), // Top 5 matches

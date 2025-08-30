@@ -389,10 +389,10 @@ class GoldenThreadAnalyzer {
 
     const connectionScore = Math.round(totalStrength * 100);
 
-    return {
+  return { 
       connections,
-      connectionScore,
-      missingConnections,
+    connectionScore,
+    missingConnections,
       strongConnections
     };
   }
@@ -550,11 +550,11 @@ class GoldenThreadAnalyzer {
 
 export async function POST(req: NextRequest) {
   try {
-    const { text } = await req.json();
+  const { text } = await req.json();
 
-    if (!text || typeof text !== "string") {
-      return NextResponse.json({ error: "Missing or invalid text" }, { status: 400 });
-    }
+  if (!text || typeof text !== "string") {
+    return NextResponse.json({ error: "Missing or invalid text" }, { status: 400 });
+  }
 
     const analyzer = new GoldenThreadAnalyzer(text);
     const result = analyzer.analyze();

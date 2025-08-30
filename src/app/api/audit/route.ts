@@ -546,7 +546,7 @@ class ClinicalAuditAnalyzer {
         feedback.push(`Needs improvement in ${criterion.name.toLowerCase()}`);
       } else if (score < criterion.maxScore * 0.8) {
         feedback.push(`Moderate performance in ${criterion.name.toLowerCase()}`);
-      } else {
+  } else {
         feedback.push(`Good performance in ${criterion.name.toLowerCase()}`);
       }
     }
@@ -584,7 +584,7 @@ class ClinicalAuditAnalyzer {
     } else if (auditResults.overallScore < 80) {
       suggestions.push("Focus on specific areas of weakness identified in the audit");
       suggestions.push("Review and update documentation practices regularly");
-    } else {
+  } else {
       suggestions.push("Maintain current high standards and consider advanced training opportunities");
     }
 
@@ -647,7 +647,7 @@ class ClinicalAuditAnalyzer {
       feedback.push("Satisfactory documentation quality with several areas needing attention");
     } else if (auditResults.overallScore >= 60) {
       feedback.push("Documentation quality needs improvement in multiple areas");
-    } else {
+  } else {
       feedback.push("Significant improvements needed in documentation quality and completeness");
     }
 
@@ -662,7 +662,7 @@ class ClinicalAuditAnalyzer {
         feedback.push(`${category.name} needs significant improvement (${percentage}% score)`);
       } else if (percentage < 80) {
         feedback.push(`${category.name} has room for improvement (${percentage}% score)`);
-      } else {
+  } else {
         feedback.push(`${category.name} demonstrates good performance (${percentage}% score)`);
       }
     }
@@ -695,10 +695,10 @@ class ClinicalAuditAnalyzer {
     const suggestions = this.generateImprovementSuggestions(auditResults);
     const trainingRecommendations = this.generateTrainingRecommendations(auditResults);
 
-    return {
+  return {
       audit_score: overallScore,
-      feedback,
-      suggestions,
+    feedback,
+    suggestions,
       training_recommendations: trainingRecommendations,
       detailed_analysis: {
         categories,
@@ -711,17 +711,17 @@ class ClinicalAuditAnalyzer {
 
 export async function POST(req: NextRequest) {
   try {
-    const { text } = await req.json();
+  const { text } = await req.json();
 
-    if (!text || typeof text !== "string") {
-      return NextResponse.json({ error: "Missing or invalid text" }, { status: 400 });
-    }
+  if (!text || typeof text !== "string") {
+    return NextResponse.json({ error: "Missing or invalid text" }, { status: 400 });
+  }
 
     // Perform comprehensive clinical audit analysis
     const analyzer = new ClinicalAuditAnalyzer(text);
     const result = analyzer.analyze();
 
-    return NextResponse.json(result);
+  return NextResponse.json(result);
     
   } catch (error) {
     console.error('Clinical audit analysis error:', error);
